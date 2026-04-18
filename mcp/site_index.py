@@ -498,6 +498,8 @@ class SiteIndex:
             score = 0
             evidence: list[str] = []
             topics = person.get("research_areas", []) + person.get("related_topics", [])
+            # Note: keywords are intentionally excluded here. Keywords include person names,
+            # job titles, and institution names which should not score as research-topic matches.
             for value in topics:
                 hay = normalize_text(value)
                 if not hay:

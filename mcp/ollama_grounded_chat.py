@@ -538,6 +538,8 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
 
     person = raw_context.get("person")
     if person:
+        # Merge research_areas and related_topics, deduplicating while preserving order
+        # so that the first occurrence (research_areas take priority) is kept.
         research_areas = list(dict.fromkeys(
             person.get("research_areas", []) + person.get("related_topics", [])
         ))
@@ -560,7 +562,8 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
 
     course_context = raw_context.get("course_context")
     if course_context:
-        course_record = course_context.get("course") if isinstance(course_context.get("course"), dict) else course_context
+        course_inner = course_context.get("course")
+        course_record = course_inner if isinstance(course_inner, dict) else course_context
         offerings_record = course_context.get("offerings")
         if isinstance(offerings_record, dict) and "offerings" in offerings_record:
             offerings_source = offerings_record.get("offerings")
