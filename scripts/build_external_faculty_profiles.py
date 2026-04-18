@@ -155,7 +155,7 @@ def is_topic_item(text: str) -> bool:
     if SENTENCE_STARTER_PATTERN.match(text_key):
         return False
     # "period space" in the middle of an item means it contains multiple sentences.
-    if ". " in text:
+    if ". " in text_key:
         return False
     return True
 

@@ -538,8 +538,10 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
 
     person = raw_context.get("person")
     if person:
-        # Merge research_areas and related_topics, deduplicating while preserving order
-        # so that the first occurrence (research_areas take priority) is kept.
+        # Merge research_areas and related_topics so that faculty who populate only
+        # related_topics (not research_areas) still have their topics surfaced in the
+        # compact context under a single unified key.  research_areas takes priority.
+        # Order-preserving dedup (dict.fromkeys) is used to maintain priority ordering.
         research_areas = list(dict.fromkeys(
             person.get("research_areas", []) + person.get("related_topics", [])
         ))
@@ -562,6 +564,9 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
 
     course_context = raw_context.get("course_context")
     if course_context:
+        # get_course_context() returns {"course": {...}, "offerings": {...}, "relationships": {...}}.
+        # Flat dicts (legacy callers or direct dict construction) are also accepted as a fallback.
+        # The "offerings" value is itself a dict with an inner "offerings" list, so unwrap it.
         course_inner = course_context.get("course")
         course_record = course_inner if isinstance(course_inner, dict) else course_context
         offerings_record = course_context.get("offerings")
