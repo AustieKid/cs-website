@@ -123,6 +123,7 @@ class SiteIndex:
         self._course_alias_map = self._build_course_alias_map()
         self._program_alias_map = self._build_program_alias_map()
         self._group_alias_map = self._build_group_alias_map()
+        self._person_group_map = self._build_person_group_map()
 
     def _format_external_profiles(self, person: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
         formatted_profiles = []
@@ -342,6 +343,15 @@ class SiteIndex:
                     mapping[normalized] = group
         return mapping
 
+    def _build_person_group_map(self) -> dict[str, list[dict[str, Any]]]:
+        """Build reverse index: person slug → list of groups they lead or belong to."""
+        mapping: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for group in self.groups:
+            for slug in group.get("lead_people", []) + group.get("member_people", []):
+                if slug:
+                    mapping[slug].append(group)
+        return dict(mapping)
+
     def _entity_brief(self, entity_type: str, entity: dict[str, Any]) -> dict[str, Any]:
         result = {
             "type": entity_type,
@@ -461,6 +471,21 @@ class SiteIndex:
                 profile_blob = normalize_text(json.dumps(ext, sort_keys=True))
                 if normalized and normalized in profile_blob:
                     score += 8
+            for group in self._person_group_map.get(person["slug"], []):
+                group_haystacks = [
+                    group.get("group_name"),
+                    group.get("title"),
+                    " ".join(group.get("aliases", [])),
+                    " ".join(group.get("related_topics", [])),
+                ]
+                for value in group_haystacks:
+                    hay = normalize_text(value)
+                    if not hay:
+                        continue
+                    if hay == normalized:
+                        score += 20
+                    elif normalized and normalized in hay:
+                        score += 8
             if score > 0:
                 results.append(EntityMatch("person", score, person))
         results.sort(key=lambda item: (-item.score, item.data["person_name"]))
@@ -472,7 +497,7 @@ class SiteIndex:
         for person in self.people:
             score = 0
             evidence: list[str] = []
-            topics = person.get("research_areas", []) + person.get("related_topics", []) + person.get("keywords", [])
+            topics = person.get("research_areas", []) + person.get("related_topics", [])
             for value in topics:
                 hay = normalize_text(value)
                 if not hay:
@@ -483,6 +508,17 @@ class SiteIndex:
                 elif normalized and normalized in hay:
                     score += 15
                     evidence.append(value)
+            for group in self._person_group_map.get(person["slug"], []):
+                for value in group.get("related_topics", []):
+                    hay = normalize_text(value)
+                    if not hay:
+                        continue
+                    if hay == normalized:
+                        score += 25
+                        evidence.append(value)
+                    elif normalized and normalized in hay:
+                        score += 8
+                        evidence.append(value)
             ext = self.get_external_faculty_profile(person["slug"])
             if ext:
                 for profile in ext.get("profiles", []):

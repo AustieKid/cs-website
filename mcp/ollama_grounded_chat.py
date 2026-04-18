@@ -538,11 +538,14 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
 
     person = raw_context.get("person")
     if person:
+        research_areas = list(dict.fromkeys(
+            person.get("research_areas", []) + person.get("related_topics", [])
+        ))
         compact["person"] = {
             "name": person.get("person_name") or person.get("title"),
             "job_title": person.get("job_title"),
             "summary": person.get("summary"),
-            "research_areas": limit_list(person.get("research_areas"), limits["related_courses"]),
+            "research_areas": limit_list(research_areas, limits["related_courses"]),
             "aliases": limit_list(person.get("aliases"), limits["links"]),
             "url": person.get("canonical_url") or person.get("url"),
         }
@@ -557,13 +560,19 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
 
     course_context = raw_context.get("course_context")
     if course_context:
+        course_record = course_context.get("course") if isinstance(course_context.get("course"), dict) else course_context
+        offerings_record = course_context.get("offerings")
+        if isinstance(offerings_record, dict) and "offerings" in offerings_record:
+            offerings_source = offerings_record.get("offerings")
+        else:
+            offerings_source = offerings_record
         compact["course_context"] = {
-            "course_code": course_context.get("course_code"),
-            "title": course_context.get("title"),
-            "description": course_context.get("description"),
-            "instructors": limit_list(course_context.get("instructors"), limits["links"]),
-            "offerings": compact_offerings(course_context.get("offerings"), limits["offerings"]),
-            "url": course_context.get("canonical_url") or course_context.get("url"),
+            "course_code": course_record.get("course_code"),
+            "title": course_record.get("title") or course_record.get("course_name"),
+            "description": course_record.get("description"),
+            "instructors": limit_list(course_record.get("instructors"), limits["links"]),
+            "offerings": compact_offerings(offerings_source, limits["offerings"]),
+            "url": course_record.get("canonical_url") or course_record.get("url"),
         }
 
     course_contexts = compact_course_contexts(raw_context.get("course_contexts"), limits)
