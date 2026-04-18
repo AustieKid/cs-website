@@ -75,11 +75,6 @@ people:
       source_title: DANIELHAEHN.com
       resolved_url: https://danielhaehn.com
       fields:
-        publication_links:
-          value:
-          - url: https://danielhaehn.com/papers/?+BIBTEXKEY+
-          confidence: medium
-          source_section: page links
         profile_links:
           value:
           - url: https://scholar.google.com/citations?user=HGvsO6oAAAAJ&hl=en
@@ -149,7 +144,7 @@ people:
           confidence: high
           source_section: meta description
         lab_or_group:
-          value: Center for Human Modeling and Simulation,
+          value: Center for Human Modeling and Simulation
           confidence: medium
           source_section: page links
         recent_news_titles:
@@ -799,11 +794,6 @@ people:
           value: Tiago is an associate professor at University of Massachusetts Boston. Tiago's research helps programmers write software with fewer bugs.
           confidence: medium
           source_section: intro paragraph
-        research_topics:
-          value:
-          - You can meet my collaborators at the Software Verification Lab
-          confidence: medium
-          source_section: Research
         lab_or_group:
           value: Software Verification Lab
           confidence: medium

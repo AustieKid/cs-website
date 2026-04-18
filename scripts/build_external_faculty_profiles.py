@@ -81,6 +81,12 @@ TERM_PATTERN = re.compile(
     r"\b(Fall|Spring|Summer(?:\s+Session\s+[123])?)\s+(20\d{2})\b",
     re.IGNORECASE,
 )
+# Sentence-starter words whose presence at the beginning of a research-topic item
+# indicates it is prose/navigational text, not a topic name.
+SENTENCE_STARTER_PATTERN = re.compile(
+    r"^(i |you |we |they |it |this |the |these |those |a |an |my |our |your )",
+    re.IGNORECASE,
+)
 SUMMARY_CANDIDATE_MIN_LENGTH = 80
 SUMMARY_CANDIDATE_MAX_LENGTH = 400
 
@@ -131,12 +137,27 @@ def is_bio_summary_candidate(text: str) -> bool:
             "associate professor",
             "assistant professor",
             "senior lecturer",
+            "lecturer",
             "professor",
             "research focuses",
             "research interests",
             "department of computer science",
         )
     )
+
+
+def is_topic_item(text: str) -> bool:
+    """Return True when text looks like a research topic name (not a sentence)."""
+    text_key = text.casefold().strip()
+    if not text_key:
+        return False
+    # Prose sentences typically start with a pronoun, article, or possessive.
+    if SENTENCE_STARTER_PATTERN.match(text_key):
+        return False
+    # "period space" in the middle of an item means it contains multiple sentences.
+    if ". " in text:
+        return False
+    return True
 
 
 def is_generic_group_label(value: str) -> bool:
@@ -373,6 +394,25 @@ def extract_sections(root, base_url: str) -> list[dict]:
     sections: list[dict] = []
     current = {"heading": "page", "texts": [], "links": []}
 
+    # Pre-identify <p> / <dt> elements whose sole non-whitespace content is a
+    # <b> or <strong> tag – treat these as implicit section headings.  Old-style
+    # faculty homepages often use <p><b>Research Interests</b></p> rather than
+    # a proper <h*> tag for section headers.
+    bold_heading_ids: set[int] = set()
+    for node in root.find_all(["p", "dt"]):
+        content_nodes = [
+            c
+            for c in node.children
+            if getattr(c, "name", None) is not None
+            or (isinstance(c, str) and c.strip())
+        ]
+        if len(content_nodes) == 1:
+            child = content_nodes[0]
+            if getattr(child, "name", None) in {"b", "strong"}:
+                heading_text = collapse_whitespace(child.get_text(" ", strip=True))
+                if heading_text:
+                    bold_heading_ids.add(id(node))
+
     def start_section(heading: str):
         nonlocal current
         if current["texts"] or current["links"]:
@@ -385,15 +425,21 @@ def extract_sections(root, base_url: str) -> list[dict]:
             if heading:
                 start_section(heading)
             continue
+        if id(node) in bold_heading_ids:
+            heading = collapse_whitespace(node.find(["b", "strong"]).get_text(" ", strip=True))
+            if heading:
+                start_section(heading)
+            continue
         if getattr(node, "name", None) == "a":
             href = node.get("href")
             text = collapse_whitespace(node.get_text(" ", strip=True))
             if href and text:
                 current["links"].append({"text": text, "url": urljoin(base_url, href)})
         if getattr(node, "name", None) in {"p", "li"}:
-            text = collapse_whitespace(node.get_text(" ", strip=True))
-            if text:
-                current["texts"].append(text)
+            if id(node) not in bold_heading_ids:
+                text = collapse_whitespace(node.get_text(" ", strip=True))
+                if text:
+                    current["texts"].append(text)
 
     if current["texts"] or current["links"]:
         sections.append(current)
@@ -446,8 +492,12 @@ def extract_research_topics(sections: list[dict]) -> tuple[list[str], str] | tup
             topics: list[str] = []
             for text in section["texts"]:
                 if "," in text and len(text) < 160:
-                    topics.extend(part.strip() for part in text.split(","))
-                elif len(text) <= 80:
+                    topics.extend(
+                        part.strip()
+                        for part in text.split(",")
+                        if part.strip() and is_topic_item(part.strip())
+                    )
+                elif len(text) <= 80 and is_topic_item(text):
                     topics.append(text)
             topics = normalize_list(topics)
             if topics:
@@ -462,18 +512,18 @@ def extract_lab_or_group(sections: list[dict], links: list[dict]) -> tuple[str, 
                 text_key = link["text"].casefold()
                 if has_group_keyword(text_key):
                     if not is_generic_group_label(link["text"]):
-                        return link["text"], section["heading"]
+                        return collapse_whitespace(link["text"].rstrip(" ,;.:")), section["heading"]
             for text in section["texts"]:
                 text_key = text.casefold()
                 if has_group_keyword(text_key):
                     if not is_generic_group_label(text):
-                        return text, section["heading"]
+                        return collapse_whitespace(text.rstrip(" ,;.:")), section["heading"]
     for link in links:
         link_text = f"{link['text']} {link['url']}".casefold()
         if has_group_keyword(link_text):
             label = link["text"] or link["url"]
             if not is_generic_group_label(label):
-                return label, "page links"
+                return collapse_whitespace(label.rstrip(" ,;.:")), "page links"
     return None, None
 
 
@@ -505,6 +555,7 @@ def extract_publication_links(sections: list[dict], links: list[dict]) -> tuple[
         link
         for link in links
         if any(pattern in f"{link['text']} {link['url']}".casefold() for pattern in ("publication", "paper", "arxiv"))
+        and "bibtexkey" not in link["url"].casefold()
     ]
     values = normalize_link_entries(filtered)
     if values:
