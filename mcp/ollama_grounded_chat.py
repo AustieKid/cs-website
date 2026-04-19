@@ -324,7 +324,10 @@ def build_context(mcp: MCPClient, query: str) -> dict:
     }
 
     course_code = intent["explicit_course"]
-    if course_code:
+    # For TEACHING intent the course is already covered by course_contexts; fetching
+    # course_context separately would duplicate the same data in the raw context and
+    # the compact/grounded output.  COURSE_LOOKUP (non-teaching) still needs it.
+    if course_code and not intent["teaching"]:
         course_context = fetch_course_context(mcp, course_code)
         if course_context:
             context["course_context"] = course_context
@@ -531,11 +534,6 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
     else:
         compact["matched_courses"] = []
 
-    if intent == INTENT_PERSON_RESEARCH:
-        compact["matched_entities"] = compact_search_hits(raw_context.get("search_site_entities"), 1)
-    else:
-        compact["matched_entities"] = compact_search_hits(raw_context.get("search_site_entities"), limits["search_hits"])
-
     person = raw_context.get("person")
     if person:
         # Merge research_areas and related_topics so that faculty who populate only
@@ -550,7 +548,6 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
             "job_title": person.get("job_title"),
             "summary": person.get("summary"),
             "research_areas": limit_list(research_areas, limits["related_courses"]),
-            "aliases": limit_list(person.get("aliases"), limits["links"]),
             "url": person.get("canonical_url") or person.get("url"),
         }
 
@@ -602,7 +599,7 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
                 "url": person_hit.get("canonical_url") or person_hit.get("url"),
             }
         )
-    if faculty_topics and intent not in {INTENT_TEACHING, INTENT_PERSON_TEACHING, INTENT_PERSON_RESEARCH}:
+    if faculty_topics and intent not in {INTENT_TEACHING, INTENT_PERSON_TEACHING, INTENT_PERSON_RESEARCH, INTENT_COURSE_LOOKUP}:
         compact["faculty_topic_matches"] = faculty_topics
 
     return compact
@@ -657,9 +654,7 @@ def build_grounding_block(compact_context: dict) -> str:
 
     course_context = compact_context.get("course_context")
     if course_context:
-        lines.append(
-            f"- Matched course: {course_context.get('course_code')}: {course_context.get('title')}"
-        )
+        lines.append(f"- Matched course: {course_context.get('title')}")
         if course_context.get("description"):
             lines.append(f"- Course description: {course_context['description']}")
         if course_context.get("instructors"):
@@ -669,12 +664,14 @@ def build_grounding_block(compact_context: dict) -> str:
     if course_contexts and intent in {INTENT_TEACHING, INTENT_COURSE_LOOKUP}:
         lines.append("- Matched course offerings:")
         for course in course_contexts:
-            line = f"  - {course.get('course_code')}: {course.get('title')}"
+            line = f"  - {course.get('title')}"
             if course.get("instructors"):
                 line += f" | instructors: {', '.join(course['instructors'])}"
             if course.get("url"):
                 line += f" [{course['url']}]"
             lines.append(line)
+            if course.get("description"):
+                lines.append(f"    Description: {course['description']}")
             for offering in course.get("offerings") or []:
                 offering_line = f"    - {offering.get('term')}: {offering.get('instructor')}"
                 details = [
