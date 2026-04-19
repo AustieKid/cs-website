@@ -798,15 +798,20 @@ keywords:
     }
 
     function deduplicateEntries(entries) {
-      const seenUrls = new Set();
-      const seenTitles = new Set();
+      const seen = new Set();
       return entries.filter((entry) => {
-        const url = entry.item.url || '';
-        const titleKey = normalizeText(entry.item.title).replace(/[^a-z0-9]/g, '');
-        if (url && seenUrls.has(url)) { return false; }
-        if (titleKey && seenTitles.has(titleKey)) { return false; }
-        if (url) { seenUrls.add(url); }
-        if (titleKey) { seenTitles.add(titleKey); }
+        const item = entry.item || {};
+        const stableKey = item.url || item.permalink || item.slug || item.id || '';
+        if (stableKey) {
+          if (seen.has(stableKey)) return false;
+          seen.add(stableKey);
+          return true;
+        }
+        const fallbackTitle = normalizeText(item.title || '').replace(/[^a-z0-9]/g, '');
+        if (!fallbackTitle) return true;
+        const titleKey = 'title:' + fallbackTitle;
+        if (seen.has(titleKey)) return false;
+        seen.add(titleKey);
         return true;
       });
     }
