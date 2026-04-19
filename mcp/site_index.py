@@ -370,6 +370,17 @@ class SiteIndex:
             result["slug"] = entity.get("slug")
         if entity_type == "group":
             result["slug"] = entity.get("slug")
+            result["lead_people"] = [
+                self.people_by_slug[slug].get("person_name")
+                for slug in entity.get("lead_people", [])
+                if slug in self.people_by_slug
+            ]
+            result["member_people"] = [
+                self.people_by_slug[slug].get("person_name")
+                for slug in entity.get("member_people", [])
+                if slug in self.people_by_slug
+            ]
+            result["related_topics"] = entity.get("related_topics", [])
         return result
 
     def match_course(self, query: str) -> dict[str, Any] | None:

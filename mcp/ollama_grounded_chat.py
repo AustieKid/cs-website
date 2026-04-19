@@ -602,6 +602,23 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
     if faculty_topics and intent not in {INTENT_TEACHING, INTENT_PERSON_TEACHING, INTENT_PERSON_RESEARCH, INTENT_COURSE_LOOKUP}:
         compact["faculty_topic_matches"] = faculty_topics
 
+    if intent == INTENT_RESEARCH:
+        group_hits = [
+            h for h in (raw_context.get("search_site_entities") or [])
+            if h.get("type") == "group"
+        ]
+        if group_hits:
+            compact["matched_groups"] = [
+                {
+                    "name": h.get("title"),
+                    "lead_people": h.get("lead_people") or [],
+                    "member_people": h.get("member_people") or [],
+                    "related_topics": h.get("related_topics") or [],
+                    "url": h.get("canonical_url") or h.get("url"),
+                }
+                for h in group_hits[:limits["search_hits"]]
+            ]
+
     return compact
 
 
@@ -687,6 +704,20 @@ def build_grounding_block(compact_context: dict) -> str:
     teaching_instructors = compact_context.get("teaching_instructors")
     if teaching_instructors and intent in {INTENT_TEACHING, INTENT_COURSE_LOOKUP}:
         lines.append(f"- Instructors found in current/upcoming offerings: {', '.join(teaching_instructors)}")
+
+    matched_groups = compact_context.get("matched_groups")
+    if matched_groups:
+        for group in matched_groups:
+            group_line = f"- Research group: {group.get('name')}"
+            if group.get("lead_people"):
+                group_line += f" | director(s): {', '.join(group['lead_people'])}"
+            if group.get("member_people"):
+                group_line += f" | members: {', '.join(group['member_people'])}"
+            if group.get("url"):
+                group_line += f" [{group['url']}]"
+            lines.append(group_line)
+            if group.get("related_topics"):
+                lines.append(f"  - Group research topics: {', '.join(group['related_topics'])}")
 
     faculty_topic_matches = compact_context.get("faculty_topic_matches")
     if faculty_topic_matches:

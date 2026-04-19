@@ -18,6 +18,12 @@ keywords:
 aliases:
 - Gabriel Ghinita
 research_areas: []
+related_topics:
+- data security
+- data privacy
+- geospatial data
+- location-based services
+- access control
 related_courses: []
 affiliations:
 - University of Massachusetts Boston

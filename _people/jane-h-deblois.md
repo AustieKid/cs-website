@@ -19,6 +19,9 @@ aliases:
 - Jane H. DeBlois
 - Jane DeBlois
 research_areas: []
+related_topics:
+- algorithms
+- parallel computing
 related_courses: []
 affiliations:
 - University of Massachusetts Boston

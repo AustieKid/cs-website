@@ -19,6 +19,11 @@ aliases:
 - Torna Soro
 - Torna Omar Soro
 research_areas: []
+related_topics:
+- machine learning
+- artificial intelligence
+- predictive modeling
+- health information technology
 related_courses: []
 affiliations:
 - University of Massachusetts Boston
