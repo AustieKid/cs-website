@@ -15,11 +15,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL = "llama3.2:1b"
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 DEFAULT_LIMITS = {
-    "search_hits": 3,
-    "offerings": 5,
-    "related_courses": 8,
-    "recent_news": 3,
-    "links": 5,
+    "search_hits": 2,
+    "offerings": 3,
+    "related_courses": 4,
+    "recent_news": 2,
+    "links": 3,
 }
 FULL_LIMITS = {
     "search_hits": 5,
@@ -231,6 +231,7 @@ def query_mentions_program(query: str) -> bool:
             "degree",
             "minor",
             "certificate",
+            "concentration",
         ]
     ):
         return True
@@ -592,7 +593,7 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
         "intent": intent,
     }
 
-    if intent in {INTENT_TEACHING, INTENT_COURSE_LOOKUP, INTENT_PROGRAM}:
+    if intent in {INTENT_TEACHING, INTENT_COURSE_LOOKUP, INTENT_PROGRAM, INTENT_RESEARCH}:
         compact["matched_people"] = []
     elif intent in {INTENT_PERSON_RESEARCH, INTENT_PERSON_LOOKUP, INTENT_PERSON_TEACHING}:
         compact["matched_people"] = compact_search_hits(raw_context.get("search_people"), 1)
@@ -665,7 +666,7 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
         faculty_topics.append(
             {
                 "name": person_hit.get("title"),
-                "matching_topics": limit_list(person_hit.get("matching_topics"), 5),
+                "matching_topics": limit_list(person_hit.get("matching_topics"), 2),
                 "url": person_hit.get("canonical_url") or person_hit.get("url"),
             }
         )
@@ -685,7 +686,8 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
                 {
                     "name": h.get("title"),
                     "lead_people": h.get("lead_people") or [],
-                    "member_people": h.get("member_people") or [],
+                    # Cap member_people list to avoid large groups overwhelming the block.
+                    "member_people": (h.get("member_people") or [])[:3],
                     "related_topics": h.get("related_topics") or [],
                     "url": h.get("canonical_url") or h.get("url"),
                 }
@@ -792,7 +794,8 @@ def build_grounding_block(compact_context: dict) -> str:
             if course.get("url"):
                 line += f" [{course['url']}]"
             lines.append(line)
-            if course.get("description"):
+            # Only show description for course-lookup queries, not for "who teaches X?" queries.
+            if course.get("description") and intent == INTENT_COURSE_LOOKUP:
                 lines.append(f"    Description: {course['description']}")
             for offering in course.get("offerings") or []:
                 offering_line = f"    - {offering.get('term')}: {offering.get('instructor')}"
@@ -863,7 +866,8 @@ def build_grounding_block(compact_context: dict) -> str:
         if external.get("lab_or_group"):
             lines.append(f"- External lab/group: {external['lab_or_group']}")
             has_explicit_research_signal = True
-        if external.get("recent_news_titles"):
+        # recent_news is irrelevant for research-intent queries; omit to save budget.
+        if external.get("recent_news_titles") and intent != INTENT_PERSON_RESEARCH:
             lines.append(f"- External recent news: {', '.join(external['recent_news_titles'])}")
         if external.get("source_url"):
             lines.append(f"- External source: {external['source_url']}")
@@ -871,7 +875,6 @@ def build_grounding_block(compact_context: dict) -> str:
             external.get("external_summary")
             or novel_ext_topics
             or external.get("lab_or_group")
-            or external.get("recent_news_titles")
         ):
             lines.append("- External profile found, but no explicit research-topic fields were extracted.")
 
