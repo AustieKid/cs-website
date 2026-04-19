@@ -232,8 +232,16 @@ def query_mentions_program(query: str) -> bool:
             "minor",
             "certificate",
             "concentration",
+            "bachelor",
+            "master",
+            "graduate program",
+            "graduate degree",
         ]
     ):
+        return True
+    # Standalone abbreviations like "CS BA", "CS BS", "CS MS", "CS PhD"
+    import re as _re
+    if _re.search(r"\b(ba|bs|ms|phd)\b", lowered):
         return True
     # "need" combined with a class/course/cs context indicates "what do I need to take?"
     if "need" in lowered and any(t in lowered for t in ["class", "course", "take", "cs"]):
@@ -270,14 +278,15 @@ def detect_query_intent(query: str) -> dict:
         intent = INTENT_PERSON_RESEARCH
     elif teaching and explicit_person:
         intent = INTENT_PERSON_TEACHING
+    elif program and not explicit_person:
+        # Program queries win over general teaching intent (e.g. "courses required for CS BA").
+        intent = INTENT_PROGRAM
     elif teaching:
         intent = INTENT_TEACHING
     elif explicit_course:
         intent = INTENT_COURSE_LOOKUP
     elif explicit_person:
         intent = INTENT_PERSON_LOOKUP
-    elif program and not explicit_person:
-        intent = INTENT_PROGRAM
     elif research:
         intent = INTENT_RESEARCH
     else:
@@ -345,7 +354,7 @@ def build_context(mcp: MCPClient, query: str) -> dict:
 
     # For program intent, ensure degree-requirement pages are always retrieved
     if intent["type"] == INTENT_PROGRAM:
-        for extra in ["degree requirements", "computer science major"]:
+        for extra in ["degree requirements", "computer science major", "graduate program", "master"]:
             site_hits.extend(mcp.call_tool("search_site_entities", {"query": extra, "limit": 4}) or [])
 
     # Deduplicate site_hits before truncation so program/group entities aren't lost
@@ -697,18 +706,34 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
     if intent == INTENT_PROGRAM:
         program_contexts = raw_context.get("program_contexts") or []
         if program_contexts:
+            # Prefer programs with structured requirement_summary so that specific
+            # program pages (CS BS, CS MS, etc.) are ranked ahead of generic index
+            # pages (graduate-programs, undergraduate-programs) that have no summary.
+            program_contexts_ranked = sorted(
+                program_contexts,
+                key=lambda p: 0 if p.get("requirement_summary") else 1,
+            )
             compact["matched_programs"] = [
                 {
                     "name": p.get("title") or p.get("program_name"),
-                    "summary": p.get("summary") or p.get("description"),
+                    "program_level": p.get("program_level"),
+                    "requirement_summary": p.get("requirement_summary"),
+                    "prerequisite_summary": p.get("prerequisite_summary"),
+                    "requirement_keywords": (p.get("requirement_keywords") or [])[:8],
                     "url": p.get("canonical_url") or p.get("url"),
-                    "related_courses": [
-                        c.get("course_code")
-                        for c in (p.get("related_courses") or [])
-                        if c.get("course_code")
-                    ][:limits["related_courses"]],
+                    # Fall back to listing key courses only when no requirement_summary is available.
+                    "related_courses": (
+                        []
+                        if p.get("requirement_summary")
+                        else [
+                            c.get("course_code")
+                            for c in (p.get("related_courses") or [])
+                            if c.get("course_code")
+                        ][:limits["related_courses"]]
+                    ),
                 }
-                for p in program_contexts[:limits["search_hits"]]
+                # Use up to 3 programs (structured summaries are compact enough).
+                for p in program_contexts_ranked[:3]
             ]
         else:
             # Fallback when build_context didn't populate program_contexts (e.g. simulation)
@@ -720,7 +745,8 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
                 compact["matched_programs"] = [
                     {
                         "name": h.get("title"),
-                        "summary": h.get("summary"),
+                        "program_level": h.get("program_level"),
+                        "requirement_summary": h.get("requirement_summary"),
                         "url": h.get("canonical_url") or h.get("url"),
                     }
                     for h in program_hits[:limits["search_hits"]]
@@ -817,13 +843,19 @@ def build_grounding_block(compact_context: dict) -> str:
     if matched_programs:
         for prog in matched_programs:
             prog_line = f"- Degree program: {prog.get('name')}"
+            if prog.get("program_level"):
+                prog_line += f" ({prog['program_level']})"
             if prog.get("url"):
                 prog_line += f" [{prog['url']}]"
             lines.append(prog_line)
-            if prog.get("summary"):
-                lines.append(f"  - Description: {prog['summary']}")
-            if prog.get("related_courses"):
-                lines.append(f"  - Required/related courses: {', '.join(prog['related_courses'])}")
+            # Prefer structured requirement_summary over generic description prose.
+            if prog.get("requirement_summary"):
+                lines.append(f"  - Requirements: {prog['requirement_summary']}")
+            if prog.get("prerequisite_summary"):
+                lines.append(f"  - Prerequisites: {prog['prerequisite_summary']}")
+            # Only list courses when no structured summary is available.
+            if prog.get("related_courses") and not prog.get("requirement_summary"):
+                lines.append(f"  - Key courses: {', '.join(prog['related_courses'])}")
 
     matched_groups = compact_context.get("matched_groups")
     if matched_groups:

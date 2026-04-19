@@ -53,6 +53,19 @@ related_courses:
 - CS450
 - CS460
 - CS461
+program_level: graduate
+requirement_summary: "Required: CS680, CS681, CS682 (9 credits, software dev capstone); 2 theoretical electives (CS620/622/624/420/720/724); 5 applied electives; min 30 credits total (24 at 600+ level). Max 2 upper-level undergrad courses."
+prerequisite_summary: "BS in CS or related field required; GRE required; prerequisites CS210L, CS240, CS310 for all grad courses. GPA plays role in admission."
+requirement_keywords:
+- CS680
+- CS681
+- CS682
+- CS620
+- CS624
+- 30 credits
+- GRE
+- software development
+- capstone
 related_topics:
 - master of science
 - computer science graduate study

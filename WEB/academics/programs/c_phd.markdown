@@ -27,6 +27,17 @@ related_courses:
 - CS681
 - CS682
 - CS899
+program_level: graduate
+requirement_summary: "Required: CS720, CS724, CS680, CS681, CS682; 2 theoretical + 5 applied + 4 grad-level electives; qualifying exam after 30 credits; min 15 credits CS899 dissertation; 48 credits total. Min 3.5 GPA."
+prerequisite_summary: "MS or strong BS in CS; qualifying exam covers theoretical CS and 2 specialty areas (AI, Databases, PL, Networks, Systems); dissertation advisor required."
+requirement_keywords:
+- CS720
+- CS724
+- CS899
+- qualifying exam
+- dissertation
+- 48 credits
+- research
 related_topics:
 - doctoral study
 - computer science research

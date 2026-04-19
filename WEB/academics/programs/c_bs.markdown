@@ -41,6 +41,25 @@ related_people:
 related_programs:
 - "/undergraduate-programs"
 - "/honors-programs"
+program_level: undergraduate
+requirement_summary: "Required: CS110, CS210, CS220, CS240, CS310, CS341, CS410, CS420, CS444, CS446, CS449, CS451 (or CS651), CS285L; Math140, Math141, Math260, Math345; Physics113/181/114/182; 2 CS electives. Min 2.0 GPA. ABET accredited."
+prerequisite_summary: "Math140 and CS110 required for entry; placement test may require Math130 first."
+requirement_keywords:
+- CS110
+- CS210
+- CS220
+- CS240
+- CS310
+- CS341
+- CS410
+- CS420
+- CS444
+- CS446
+- CS449
+- CS285L
+- Math140
+- ABET
+- capstone
 related_topics:
 - bachelor of science
 - computer science major

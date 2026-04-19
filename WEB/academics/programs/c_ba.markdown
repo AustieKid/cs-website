@@ -58,6 +58,22 @@ related_courses:
 - CS620
 - CS622
 - CS624
+program_level: undergraduate
+requirement_summary: "Required: CS110, CS210, CS220, CS240, CS310, CS341, CS420, CS450; Math140, Math141, Math260; 2 applied CS electives (one must be CS444 or CS451 as capstone); 1 theoretical elective; 1 additional elective. Min 2.0 GPA."
+prerequisite_summary: "Math140 and CS110 entry; placement test may require Math130 first."
+requirement_keywords:
+- CS110
+- CS210
+- CS220
+- CS240
+- CS310
+- CS341
+- CS420
+- CS450
+- CS444
+- CS451
+- Math140
+- capstone
 related_topics:
 - bachelor of arts
 - computer science major

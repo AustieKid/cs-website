@@ -2,6 +2,42 @@
 title: "Computer Science Minor"
 layout: page
 permalink: "/cs-minor"
+entity_type: program
+program_name: Computer Science Minor
+program_level: minor
+description: Requirements and schedule for the UMass Boston CS Minor program.
+summary: Requirements and schedule for the UMass Boston CS Minor program.
+requirement_summary: "Required: CS110, Math140, CS210, CS220, CS240, CS310; 1 CS elective at 300+ level. Min 2.0 GPA. Typically 4 semesters."
+prerequisite_summary: "Students follow a fixed sequence; prerequisites must be taken in order. 4 semesters minimum."
+requirement_keywords:
+- CS110
+- CS210
+- CS220
+- CS240
+- CS310
+- Math140
+- minor
+- elective
+keywords:
+- CS minor
+- computer science minor
+- minor in computer science
+- UMass Boston
+aliases:
+- CS Minor
+- Computer Science Minor
+- minor in CS
+related_courses:
+- CS110
+- CS210
+- CS220
+- CS240
+- CS310
+related_topics:
+- computer science minor
+- minor requirements
+- undergraduate minor
+provider_id: https://www.cs.umb.edu/#department
 ---
 
 The CS minor program provides an education in the core courses of Computer Science. It adds to the attractiveness of other majors by improving a graduate’s job opportunities post-graduation in an increasingly high tech society.
