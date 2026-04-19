@@ -797,12 +797,26 @@ keywords:
       return score;
     }
 
+    function deduplicateEntries(entries) {
+      const seenUrls = new Set();
+      const seenTitles = new Set();
+      return entries.filter((entry) => {
+        const url = entry.item.url || '';
+        const titleKey = normalizeText(entry.item.title).replace(/[^a-z0-9]/g, '');
+        if (url && seenUrls.has(url)) { return false; }
+        if (titleKey && seenTitles.has(titleKey)) { return false; }
+        if (url) { seenUrls.add(url); }
+        if (titleKey) { seenTitles.add(titleKey); }
+        return true;
+      });
+    }
+
     function getRankedEntries(query, options) {
-      return searchIndex
+      const scored = searchIndex
         .map((item) => ({ item, score: scoreItem(item, query, options) }))
         .filter((entry) => entry.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 5);
+        .sort((a, b) => b.score - a.score);
+      return deduplicateEntries(scored).slice(0, 5);
     }
 
     function getRelatedFallbackEntries(query) {
