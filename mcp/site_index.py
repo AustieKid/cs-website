@@ -552,6 +552,25 @@ class SiteIndex:
         results.sort(key=lambda item: (-item.score, item.data["title"]))
         return [match.data for match in results[:limit]]
 
+    def search_groups_by_topic(self, topic: str, limit: int = 5) -> list[dict[str, Any]]:
+        """Find research groups whose related_topics match a query topic."""
+        normalized = normalize_text(topic)
+        results: list[EntityMatch] = []
+        for group in self.groups:
+            score = 0
+            for value in group.get("related_topics", []):
+                hay = normalize_text(value)
+                if not hay:
+                    continue
+                if hay == normalized:
+                    score += 40
+                elif normalized and normalized in hay:
+                    score += 15
+            if score > 0:
+                results.append(EntityMatch("group", score, group))
+        results.sort(key=lambda item: (-item.score, item.data.get("group_name") or ""))
+        return [self._entity_brief("group", match.data) for match in results[:limit]]
+
     def search_site_entities(self, query: str, limit: int = 15) -> list[dict[str, Any]]:
         normalized = normalize_text(query)
         matches: list[EntityMatch] = []

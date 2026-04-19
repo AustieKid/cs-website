@@ -32,6 +32,7 @@ QUESTION_STOPWORDS = {
     "what", "which", "who", "does", "do", "is", "are", "the", "a", "an", "for", "of",
     "current", "upcoming", "associated", "with", "work", "works", "teach", "teaches",
     "faculty", "course", "courses", "related", "on", "in", "or", "and", "to",
+    "tell", "me", "about", "how", "i", "please", "give", "describe", "explain", "show",
 }
 
 INTENT_PERSON_RESEARCH = "person_research"
@@ -228,6 +229,8 @@ def query_mentions_program(query: str) -> bool:
             "requirements",
             "major",
             "degree",
+            "minor",
+            "certificate",
         ]
     ):
         return True
@@ -344,8 +347,23 @@ def build_context(mcp: MCPClient, query: str) -> dict:
         for extra in ["degree requirements", "computer science major"]:
             site_hits.extend(mcp.call_tool("search_site_entities", {"query": extra, "limit": 4}) or [])
 
-    # Deduplicate site_hits before truncation so program entities aren't lost
+    # Deduplicate site_hits before truncation so program/group entities aren't lost
     all_site_hits = merge_unique_items(site_hits)
+
+    # For research intent, extract group entities from full deduped list before the :6 cap,
+    # and also search groups directly by topic so they are never crowded out by courses/pages.
+    research_group_hits: list[dict] = []
+    if intent["type"] == INTENT_RESEARCH:
+        seen_group_slugs: set[str] = set()
+        for h in all_site_hits:
+            if h.get("type") == "group" and h.get("slug") not in seen_group_slugs:
+                seen_group_slugs.add(h["slug"])
+                research_group_hits.append(h)
+        for term in search_terms:
+            for g in (mcp.call_tool("search_groups_by_topic", {"topic": term, "limit": 4}) or []):
+                if g.get("slug") not in seen_group_slugs:
+                    seen_group_slugs.add(g["slug"])
+                    research_group_hits.append(g)
 
     context = {
         "query": query,
@@ -356,6 +374,8 @@ def build_context(mcp: MCPClient, query: str) -> dict:
         "search_people": merge_unique_items(people_hits)[:4],
         "search_faculty_by_topic": merge_unique_items(topic_hits)[:4],
     }
+    if research_group_hits:
+        context["research_group_hits"] = research_group_hits
 
     course_code = intent["explicit_course"]
     # For TEACHING intent the course is already covered by course_contexts; fetching
@@ -653,7 +673,10 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
         compact["faculty_topic_matches"] = faculty_topics
 
     if intent == INTENT_RESEARCH:
-        group_hits = [
+        # Prefer the dedicated research_group_hits list populated by build_context
+        # (which scans full deduped site entities AND calls search_groups_by_topic).
+        # Fall back to scanning search_site_entities for backward compatibility.
+        group_hits = raw_context.get("research_group_hits") or [
             h for h in (raw_context.get("search_site_entities") or [])
             if h.get("type") == "group"
         ]
@@ -822,10 +845,20 @@ def build_grounding_block(compact_context: dict) -> str:
 
     external = compact_context.get("external_profile")
     if external:
+        # Deduplicate external research topics against internal research areas so the
+        # same topic is not echoed twice (once internal, once external).
+        internal_areas_lower = {
+            t.casefold()
+            for t in (compact_context.get("person") or {}).get("research_areas", [])
+        }
+        novel_ext_topics = [
+            t for t in (external.get("research_topics") or [])
+            if t.casefold() not in internal_areas_lower
+        ]
         if external.get("external_summary"):
             lines.append(f"- External summary: {external['external_summary']}")
-        if external.get("research_topics"):
-            lines.append(f"- External research topics: {', '.join(external['research_topics'])}")
+        if novel_ext_topics:
+            lines.append(f"- External research topics: {', '.join(novel_ext_topics)}")
             has_explicit_research_signal = True
         if external.get("lab_or_group"):
             lines.append(f"- External lab/group: {external['lab_or_group']}")
@@ -836,7 +869,7 @@ def build_grounding_block(compact_context: dict) -> str:
             lines.append(f"- External source: {external['source_url']}")
         if intent == INTENT_PERSON_RESEARCH and not (
             external.get("external_summary")
-            or external.get("research_topics")
+            or novel_ext_topics
             or external.get("lab_or_group")
             or external.get("recent_news_titles")
         ):
@@ -865,7 +898,22 @@ def build_grounding_block(compact_context: dict) -> str:
     if intent == INTENT_PERSON_RESEARCH and not has_explicit_research_signal:
         lines.append("- Grounded research topics: not specified in the available internal or supplemental profile data.")
 
+    # Weak-evidence fallback: if retrieval produced no useful facts, say so explicitly
+    # rather than sending an empty grounding block to the model.
+    if len(lines) == 1:
+        lines.append(
+            "- No specific grounded facts were found for this query. "
+            "Please visit https://www.cs.umb.edu/cs for authoritative information."
+        )
+
     return "\n".join(lines)
+
+
+# Hard upper bound on total characters sent to the model.  Prompts that exceed
+# this limit have their grounding block tail-truncated with a notice, ensuring
+# even 1-2B parameter models with small effective context windows are never
+# overwhelmed.
+MAX_PROMPT_CHARS = 3500
 
 
 def build_prompt(query: str, compact_context: dict) -> str:
@@ -884,15 +932,29 @@ def build_prompt(query: str, compact_context: dict) -> str:
         "Do not use outside knowledge. If the grounded facts include a line saying research topics are not specified, say exactly that in substance and do not infer topics."
     )
     grounding_block = build_grounding_block(compact_context)
-    return (
+    prompt = (
         f"{instructions}\n\n"
         f"Question:\n{query}\n\n"
         f"{grounding_block}\n\n"
         "Answer:"
     )
-
-
-def main() -> int:
+    # Hard context budget: tail-truncate the grounding block if the full prompt exceeds
+    # MAX_PROMPT_CHARS so that very small models are never overwhelmed with context.
+    if len(prompt) > MAX_PROMPT_CHARS:
+        overhead = len(instructions) + len(query) + 30  # fixed parts of the prompt
+        allowed_block = MAX_PROMPT_CHARS - overhead
+        if allowed_block > 0:
+            truncated_block = grounding_block[:allowed_block].rsplit("\n", 1)[0]
+            truncated_block += "\n- [Context truncated to fit model budget]"
+        else:
+            truncated_block = "- [Context omitted: query too long for model budget]"
+        prompt = (
+            f"{instructions}\n\n"
+            f"Question:\n{query}\n\n"
+            f"{truncated_block}\n\n"
+            "Answer:"
+        )
+    return prompt
     parser = argparse.ArgumentParser(description="Ground a local Ollama model with the CS website MCP.")
     parser.add_argument("query", help="Natural-language question to ask.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Ollama model name (default: {DEFAULT_MODEL})")

@@ -84,6 +84,18 @@ class CSWebsiteMCPServer:
                 },
             },
             {
+                "name": "search_groups_by_topic",
+                "description": "Find research groups whose related topics match a query topic.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "topic": {"type": "string"},
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
+                    },
+                    "required": ["topic"],
+                },
+            },
+            {
                 "name": "get_course",
                 "description": "Fetch a single course by canonical course code or known alias.",
                 "inputSchema": {
@@ -264,6 +276,8 @@ class CSWebsiteMCPServer:
             result = self.index.search_people(required("query"), int(arguments.get("limit", 10)))
         elif name == "search_faculty_by_topic":
             result = self.index.search_faculty_by_topic(required("topic"), int(arguments.get("limit", 10)))
+        elif name == "search_groups_by_topic":
+            result = self.index.search_groups_by_topic(required("topic"), int(arguments.get("limit", 5)))
         elif name == "get_course":
             result = self.index.get_course(required("course_code"))
         elif name == "get_person":
