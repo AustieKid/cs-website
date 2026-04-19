@@ -473,7 +473,16 @@ keywords:
 
     function buildExplanation(item) {
       const label = getEntityLabel(item.type);
-      const summary = item.summary || 'No summary available.';
+      let summary = item.summary;
+      if (!summary) {
+        if (item.type === 'person') {
+          summary = `Faculty or staff member in the UMass Boston CS Department.`;
+        } else if (item.type === 'course') {
+          summary = `Course offered by the UMass Boston CS Department.`;
+        } else {
+          summary = `${label} page on the UMass Boston CS Department website.`;
+        }
+      }
       const cleanedSummary = summary.replace(/\s+/g, ' ').trim();
 
       return `${label}: ${cleanedSummary}`;
@@ -777,6 +786,13 @@ keywords:
       if (intent.navigation && item.isLandingPage && (navLabel === cleanQuery || sectionName === cleanQuery || title === cleanQuery)) { score += 320; }
       if (intent.navigation && !item.isLandingPage && (item.type === 'person' || item.type === 'course' || item.type === 'group')) { score -= 45; }
       if (intent.navigation && item.parentSection && item.parentSection === cleanQuery) { score += 40; }
+
+      // Penalise results with no summary — prefer well-described pages when alternatives exist.
+      if (!item.summary) { score -= 30; }
+
+      // Discourage person results on broad, intent-free queries (e.g. "department", "about").
+      const isGenericQuery = !intent.person && !intent.course && !intent.group && !intent.program && !intent.resource;
+      if (isGenericQuery && item.type === 'person') { score -= 50; }
 
       return score;
     }

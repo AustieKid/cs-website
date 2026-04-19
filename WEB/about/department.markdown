@@ -2,6 +2,35 @@
 title: Department
 layout: page
 permalink: "/department"
+entity_type: page
+summary: "Overview of the UMass Boston Computer Science Department: its mission, undergraduate and graduate programs, research areas, faculty, and community."
+keywords:
+  - department
+  - computer science department
+  - about the department
+  - UMass Boston CS
+  - department overview
+  - CS department
+aliases:
+  - CS department
+  - computer science department
+  - about the department
+  - UMass Boston computer science
+nav_label: Department
+section_name: Department
+parent_section: About
+menu_keywords:
+  - department
+  - computer science department
+  - about
+  - overview
+  - welcome
+related_topics:
+  - computer science
+  - research
+  - teaching
+  - programs
+  - community
 ---
 
 ---

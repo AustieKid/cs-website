@@ -2,6 +2,33 @@
 title: "Contact Us"
 layout: page
 permalink: "/contact-us"
+entity_type: page
+summary: "Contact information for the UMass Boston Computer Science Department: office address, phone, email, and staff directory."
+keywords:
+  - contact
+  - contact us
+  - department contact
+  - office
+  - phone
+  - email
+  - staff directory
+aliases:
+  - contact the department
+  - reach us
+  - department office
+nav_label: Contact Us
+section_name: Contact Us
+parent_section: About
+menu_keywords:
+  - contact
+  - contact us
+  - office
+  - phone
+  - email
+related_topics:
+  - contact information
+  - department office
+  - staff
 ---
 
 Please refer to an appropriate point of contact from the list below.
