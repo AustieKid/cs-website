@@ -28,6 +28,7 @@ affiliations:
 works_for: Computer Science Department
 same_as:
 - http://www.cs.umb.edu/~ming/
+retrieval_only: true
 related_topics:
 - high performance computing
 - parallel computing

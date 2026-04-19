@@ -17,7 +17,10 @@ keywords:
 - Computer Science Department
 aliases:
 - Stephen Chang
-research_areas: []
+research_areas:
+- programming languages
+- type systems
+- lazy evaluation
 related_courses: []
 affiliations:
 - University of Massachusetts Boston

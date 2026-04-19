@@ -24,6 +24,7 @@ affiliations:
 works_for: Computer Science Department
 same_as:
 - https://www.cs.umb.edu/~ozgun
+retrieval_only: true
 sort_order: 1
 status: active
 ---

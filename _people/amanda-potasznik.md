@@ -24,6 +24,7 @@ affiliations:
 works_for: Computer Science Department
 same_as:
 - https://blogs.umb.edu/potasznikresearch/
+retrieval_only: true
 sort_order: 18
 status: active
 ---

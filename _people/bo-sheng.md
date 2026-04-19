@@ -25,6 +25,7 @@ affiliations:
 works_for: Computer Science Department
 same_as:
 - http://www.cs.umb.edu/~shengbo
+retrieval_only: true
 sort_order: 19
 status: active
 ---

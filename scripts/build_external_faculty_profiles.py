@@ -84,7 +84,7 @@ TERM_PATTERN = re.compile(
 # Sentence-starter words whose presence at the beginning of a research-topic item
 # indicates it is prose/navigational text, not a topic name.
 SENTENCE_STARTER_PATTERN = re.compile(
-    r"^(i |you |we |they |it |this |the |these |those |a |an |my |our |your )",
+    r"^(i |you |we |they |it |this |the |these |those |a |an |my |our |your |previously\b|recently\b|formerly\b)",
     re.IGNORECASE,
 )
 SUMMARY_CANDIDATE_MIN_LENGTH = 80
@@ -157,6 +157,9 @@ def is_topic_item(text: str) -> bool:
     # "period space" in the middle of an item means it contains multiple sentences.
     if ". " in text_key:
         return False
+    # Conjunction fragments produced by comma-splitting (e.g. "and pedagogy", "or similar").
+    if text_key.startswith(("and ", "or ")):
+        return False
     return True
 
 
@@ -219,6 +222,8 @@ def load_people_seed_data() -> list[dict]:
     people: list[dict] = []
     for path in sorted(PEOPLE_DIR.glob("*.md")):
         data = parse_front_matter(path)
+        if data.get("retrieval_only"):
+            continue  # same_as URL is kept for RAG; structured extraction is not attempted
         same_as = data.get("same_as") or []
         if isinstance(same_as, str):
             same_as = [same_as]
@@ -497,7 +502,7 @@ def extract_research_topics(sections: list[dict]) -> tuple[list[str], str] | tup
                         for part in text.split(",")
                         if part.strip() and is_topic_item(part.strip())
                     )
-                elif len(text) <= 80 and is_topic_item(text):
+                elif len(text) <= 60 and is_topic_item(text):
                     topics.append(text)
             topics = normalize_list(topics)
             if topics:

@@ -18,7 +18,9 @@ keywords:
 aliases:
 - Swami Iyer
 - Swaminathan Iyer
-research_areas: []
+research_areas:
+- evolutionary dynamics
+- machine learning
 related_courses: []
 affiliations:
 - University of Massachusetts Boston

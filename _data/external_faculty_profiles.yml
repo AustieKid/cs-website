@@ -33,7 +33,6 @@ people:
       fields:
         research_topics:
           value:
-          - Semantic Models in Databases Algebraic Aspects of Multiple-Valued Logic
           - Algebraic Aspects of Multiple-Valued Logic
           confidence: medium
           source_section: Research Interests
@@ -296,19 +295,6 @@ people:
       source_title: Welcome to Jun Suzuki's Web Site
       resolved_url: https://www.cs.umb.edu/~jxs/
       fields:
-        lab_or_group:
-          value: S-3-168 (Room 168, 3rd floor, Science Center Building)
-          confidence: medium
-          source_section: page links
-        recent_news_titles:
-          value:
-          - Special Issue of International Journal of Software Engineering and Knowledge Engineering on Emerging Synergies of Artificial Intelligence and Software Engineering
-          - Special Issue of Elsevier Nano Communication Networks on Bio-inspired Computing and Communication
-          - Special Issue of Journal of Sensor and Actuator Networks on Body Area Networks
-          - Cloud-integrated Cyber-Physical Systems
-          - Modeling, Methodologies and Tools for Molecular and Nano-scale Communications
-          confidence: medium
-          source_section: News
         publication_links:
           value:
           - url: http://www.journals.elsevier.com/nano-communication-networks/call-for-papers/special-issue-on-bio-inspired-computing-and-communication/
@@ -545,16 +531,6 @@ people:
       http_status: 200
       source_title: Stephen Chang
       fields:
-        external_summary:
-          value: Homepage for Stephen Chang
-          confidence: high
-          source_section: meta description
-        research_topics:
-          value:
-          - Previously
-          - my dissertation explored lazy evaluation from both a theoretical and a practical perspective. I also enjoy hacking with/on Racket .
-          confidence: medium
-          source_section: Research interests
         lab_or_group:
           value: PLT Research Group
           confidence: medium
@@ -653,8 +629,6 @@ people:
           value:
           - Evolutionary dynamics on complex networks
           - machine learning
-          - coding
-          - and pedagogy
           confidence: medium
           source_section: Academic Interests
         profile_links:
