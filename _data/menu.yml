@@ -51,20 +51,21 @@
       link: funding
     - title: Groups
       link: groups
-    - title: Computing
-      link: research
-      submenu:
-        - title: Chimera HPC Cluster
-          link: chimera
-        - title: Unity HPC Cluster
-          url: https://unityhpc.org/
-          target: _blank
-        - title: High Performance Computing
-          url: https://www.umb.edu/rc/hpc/
-          target: _blank
-        - title: Research Computing
-          url: https://www.umb.edu/rc/
-          target: _blank
+
+- title: Computing
+  link: research
+  submenu:
+    - title: Chimera HPC Cluster
+      link: chimera
+    - title: Unity HPC Cluster
+      url: https://unityhpc.org/
+      target: _blank
+    - title: High Performance Computing
+      url: https://www.umb.edu/rc/hpc/
+      target: _blank
+    - title: Research Computing
+      url: https://www.umb.edu/rc/
+      target: _blank
 
 - title: Resources
   link: resources
