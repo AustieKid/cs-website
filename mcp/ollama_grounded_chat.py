@@ -950,8 +950,58 @@ def build_grounding_block(compact_context: dict) -> str:
 # overwhelmed.
 MAX_PROMPT_CHARS = 3500
 
+# Budget tiers (character counts) keyed by approximate model parameter size.
+# Values are (base_budget, intent_overrides) where intent_overrides is a dict
+# of intent -> budget that replaces the base for that intent.
+_MODEL_BUDGET_TIERS: list[tuple[int, int, dict]] = [
+    # (min_billion_params, base_budget, intent_overrides)
+    (0,  1800, {INTENT_PROGRAM: 2200}),  # 1B models
+    (2,  2800, {INTENT_PROGRAM: 3200}),  # 2-3B models
+    (5,  3500, {}),                      # 5-8B models
+    (8,  4500, {}),                      # 8-14B models
+    (14, 5000, {}),                      # 14B+ models
+]
 
-def build_prompt(query: str, compact_context: dict) -> str:
+
+def _parse_model_billion_params(model_name: str) -> float:
+    """Return the approximate parameter count in billions from a model name string.
+
+    Examples:
+      "llama3.2:1b"  -> 1.0
+      "llama3.2:3b"  -> 3.0
+      "mistral:7b"   -> 7.0
+      "phi3:14b"     -> 14.0
+      "llama3.2"     -> 0.0  (unknown, treated as smallest tier)
+    """
+    m = re.search(r"[:\-_](\d+(?:\.\d+)?)\s*b\b", model_name.lower())
+    if m:
+        return float(m.group(1))
+    # Some models embed the size without a tag separator, e.g. "phi3.5-mini"
+    m2 = re.search(r"(\d+(?:\.\d+)?)\s*b\b", model_name.lower())
+    if m2:
+        return float(m2.group(1))
+    return 0.0
+
+
+def get_model_prompt_budget(model_name: str, intent: str = INTENT_GENERAL) -> int:
+    """Return the maximum prompt character budget for *model_name* and *intent*.
+
+    Smaller models get tighter budgets so they are never overwhelmed.
+    Larger models get looser budgets to carry more grounding context.
+    Program/degree queries get a small uplift because requirement summaries
+    are compact but numerous.
+    """
+    billions = _parse_model_billion_params(model_name)
+    base = _MODEL_BUDGET_TIERS[0][1]
+    overrides: dict = _MODEL_BUDGET_TIERS[0][2]
+    for min_b, tier_base, tier_overrides in _MODEL_BUDGET_TIERS:
+        if billions >= min_b:
+            base = tier_base
+            overrides = tier_overrides
+    return overrides.get(intent, base)
+
+
+def build_prompt(query: str, compact_context: dict, model_name: str | None = None) -> str:
     instructions = (
         "You are answering questions about the UMass Boston Computer Science website. "
         "Use only the grounded facts below. "
@@ -973,11 +1023,13 @@ def build_prompt(query: str, compact_context: dict) -> str:
         f"{grounding_block}\n\n"
         "Answer:"
     )
-    # Hard context budget: tail-truncate the grounding block if the full prompt exceeds
-    # MAX_PROMPT_CHARS so that very small models are never overwhelmed with context.
-    if len(prompt) > MAX_PROMPT_CHARS:
+    # Dynamic context budget: smaller models get tighter character limits so they
+    # are never overwhelmed.  Larger models get more room to carry grounding context.
+    intent = compact_context.get("intent", INTENT_GENERAL)
+    budget = get_model_prompt_budget(model_name or DEFAULT_MODEL, intent)
+    if len(prompt) > budget:
         overhead = len(instructions) + len(query) + 30  # fixed parts of the prompt
-        allowed_block = MAX_PROMPT_CHARS - overhead
+        allowed_block = budget - overhead
         if allowed_block > 0:
             truncated_block = grounding_block[:allowed_block].rsplit("\n", 1)[0]
             truncated_block += "\n- [Context truncated to fit model budget]"
@@ -990,6 +1042,9 @@ def build_prompt(query: str, compact_context: dict) -> str:
             "Answer:"
         )
     return prompt
+
+
+def main() -> int:
     parser = argparse.ArgumentParser(description="Ground a local Ollama model with the CS website MCP.")
     parser.add_argument("query", help="Natural-language question to ask.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Ollama model name (default: {DEFAULT_MODEL})")
@@ -1026,6 +1081,8 @@ def build_prompt(query: str, compact_context: dict) -> str:
         compact_context = build_compact_context(raw_context, limits)
         if args.show_context:
             print(f"Selected query intent: {compact_context.get('intent')}\n")
+            budget = get_model_prompt_budget(args.model, compact_context.get("intent", INTENT_GENERAL))
+            print(f"Model prompt budget: {budget} chars (model={args.model})\n")
             print("---\n")
             print("Raw MCP context:\n")
             print(json.dumps(raw_context, indent=2, ensure_ascii=False))
@@ -1039,7 +1096,7 @@ def build_prompt(query: str, compact_context: dict) -> str:
                 print("\n---\n")
                 print(json.dumps(compact_context, indent=2, ensure_ascii=False))
             return 0
-        prompt = build_prompt(args.query, compact_context)
+        prompt = build_prompt(args.query, compact_context, model_name=args.model)
         answer = ollama_generate(args.model, prompt, args.ollama_url)
         print(answer)
         return 0
