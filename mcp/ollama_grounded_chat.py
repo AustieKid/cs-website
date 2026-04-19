@@ -40,6 +40,7 @@ INTENT_TEACHING = "teaching"
 INTENT_COURSE_LOOKUP = "course_lookup"
 INTENT_PERSON_LOOKUP = "person_lookup"
 INTENT_RESEARCH = "research"
+INTENT_PROGRAM = "program"
 INTENT_GENERAL = "general"
 
 
@@ -215,6 +216,27 @@ def query_mentions_teaching(query: str) -> bool:
     )
 
 
+def query_mentions_program(query: str) -> bool:
+    lowered = query.casefold()
+    if any(
+        token in lowered
+        for token in [
+            "prerequisite",
+            "curriculum",
+            "advising",
+            "requirement",
+            "requirements",
+            "major",
+            "degree",
+        ]
+    ):
+        return True
+    # "need" combined with a class/course/cs context indicates "what do I need to take?"
+    if "need" in lowered and any(t in lowered for t in ["class", "course", "take", "cs"]):
+        return True
+    return False
+
+
 def query_mentions_research(query: str) -> bool:
     lowered = query.casefold()
     return any(
@@ -238,6 +260,7 @@ def detect_query_intent(query: str) -> dict:
     explicit_course = detect_course_code(query)
     teaching = query_mentions_teaching(query)
     research = query_mentions_research(query)
+    program = query_mentions_program(query)
 
     if research and explicit_person:
         intent = INTENT_PERSON_RESEARCH
@@ -249,6 +272,8 @@ def detect_query_intent(query: str) -> dict:
         intent = INTENT_COURSE_LOOKUP
     elif explicit_person:
         intent = INTENT_PERSON_LOOKUP
+    elif program and not explicit_person:
+        intent = INTENT_PROGRAM
     elif research:
         intent = INTENT_RESEARCH
     else:
@@ -260,6 +285,7 @@ def detect_query_intent(query: str) -> dict:
         "explicit_course": explicit_course,
         "teaching": teaching,
         "research": research,
+        "program": program,
     }
 
 
@@ -313,11 +339,19 @@ def build_context(mcp: MCPClient, query: str) -> dict:
         people_hits.extend(mcp.call_tool("search_people", {"query": term, "limit": 4}) or [])
         topic_hits.extend(mcp.call_tool("search_faculty_by_topic", {"topic": term, "limit": 4}) or [])
 
+    # For program intent, ensure degree-requirement pages are always retrieved
+    if intent["type"] == INTENT_PROGRAM:
+        for extra in ["degree requirements", "computer science major"]:
+            site_hits.extend(mcp.call_tool("search_site_entities", {"query": extra, "limit": 4}) or [])
+
+    # Deduplicate site_hits before truncation so program entities aren't lost
+    all_site_hits = merge_unique_items(site_hits)
+
     context = {
         "query": query,
         "intent": intent,
         "search_terms": search_terms,
-        "search_site_entities": merge_unique_items(site_hits)[:6],
+        "search_site_entities": all_site_hits[:6],
         "search_courses": merge_unique_items(course_hits)[:4],
         "search_people": merge_unique_items(people_hits)[:4],
         "search_faculty_by_topic": merge_unique_items(topic_hits)[:4],
@@ -361,6 +395,22 @@ def build_context(mcp: MCPClient, query: str) -> dict:
                 course_contexts.append(fetched)
         if course_contexts:
             context["course_contexts"] = course_contexts
+
+    if intent["type"] == INTENT_PROGRAM:
+        # Use the full deduped site_hits (not the :6 truncated list) so that
+        # program entities aren't lost when many course hits appear first.
+        seen_slugs: set[str] = set()
+        program_contexts = []
+        for hit in all_site_hits:
+            if hit.get("type") == "program" and hit.get("slug"):
+                slug = hit["slug"]
+                if slug not in seen_slugs:
+                    seen_slugs.add(slug)
+                    prog = mcp.call_tool("get_program", {"program_slug_or_name": slug})
+                    if prog:
+                        program_contexts.append(prog)
+        if program_contexts:
+            context["program_contexts"] = program_contexts
 
     return context
 
@@ -522,7 +572,7 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
         "intent": intent,
     }
 
-    if intent in {INTENT_TEACHING, INTENT_COURSE_LOOKUP}:
+    if intent in {INTENT_TEACHING, INTENT_COURSE_LOOKUP, INTENT_PROGRAM}:
         compact["matched_people"] = []
     elif intent in {INTENT_PERSON_RESEARCH, INTENT_PERSON_LOOKUP, INTENT_PERSON_TEACHING}:
         compact["matched_people"] = compact_search_hits(raw_context.get("search_people"), 1)
@@ -599,7 +649,7 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
                 "url": person_hit.get("canonical_url") or person_hit.get("url"),
             }
         )
-    if faculty_topics and intent not in {INTENT_TEACHING, INTENT_PERSON_TEACHING, INTENT_PERSON_RESEARCH, INTENT_COURSE_LOOKUP}:
+    if faculty_topics and intent not in {INTENT_TEACHING, INTENT_PERSON_TEACHING, INTENT_PERSON_RESEARCH, INTENT_COURSE_LOOKUP, INTENT_PROGRAM}:
         compact["faculty_topic_matches"] = faculty_topics
 
     if intent == INTENT_RESEARCH:
@@ -618,6 +668,38 @@ def build_compact_context(raw_context: dict, limits: dict[str, int]) -> dict:
                 }
                 for h in group_hits[:limits["search_hits"]]
             ]
+
+    if intent == INTENT_PROGRAM:
+        program_contexts = raw_context.get("program_contexts") or []
+        if program_contexts:
+            compact["matched_programs"] = [
+                {
+                    "name": p.get("title") or p.get("program_name"),
+                    "summary": p.get("summary") or p.get("description"),
+                    "url": p.get("canonical_url") or p.get("url"),
+                    "related_courses": [
+                        c.get("course_code")
+                        for c in (p.get("related_courses") or [])
+                        if c.get("course_code")
+                    ][:limits["related_courses"]],
+                }
+                for p in program_contexts[:limits["search_hits"]]
+            ]
+        else:
+            # Fallback when build_context didn't populate program_contexts (e.g. simulation)
+            program_hits = [
+                h for h in (raw_context.get("search_site_entities") or [])
+                if h.get("type") in {"program", "page"}
+            ]
+            if program_hits:
+                compact["matched_programs"] = [
+                    {
+                        "name": h.get("title"),
+                        "summary": h.get("summary"),
+                        "url": h.get("canonical_url") or h.get("url"),
+                    }
+                    for h in program_hits[:limits["search_hits"]]
+                ]
 
     return compact
 
@@ -705,6 +787,18 @@ def build_grounding_block(compact_context: dict) -> str:
     if teaching_instructors and intent in {INTENT_TEACHING, INTENT_COURSE_LOOKUP}:
         lines.append(f"- Instructors found in current/upcoming offerings: {', '.join(teaching_instructors)}")
 
+    matched_programs = compact_context.get("matched_programs")
+    if matched_programs:
+        for prog in matched_programs:
+            prog_line = f"- Degree program: {prog.get('name')}"
+            if prog.get("url"):
+                prog_line += f" [{prog['url']}]"
+            lines.append(prog_line)
+            if prog.get("summary"):
+                lines.append(f"  - Description: {prog['summary']}")
+            if prog.get("related_courses"):
+                lines.append(f"  - Required/related courses: {', '.join(prog['related_courses'])}")
+
     matched_groups = compact_context.get("matched_groups")
     if matched_groups:
         for group in matched_groups:
@@ -785,6 +879,8 @@ def build_prompt(query: str, compact_context: dict) -> str:
         "Answer concisely and prioritize directly relevant facts over completeness. "
         "For teaching questions, answer from current/upcoming offering and instructor evidence first. "
         "For person research questions, answer from the matched person and supplemental external profile data first. "
+        "For program/degree/major/prerequisite questions, answer from the matched degree program pages first. "
+        "If the grounded facts do not contain specific requirements or prerequisites, say so clearly and direct the user to the relevant program page URL. "
         "Do not use outside knowledge. If the grounded facts include a line saying research topics are not specified, say exactly that in substance and do not infer topics."
     )
     grounding_block = build_grounding_block(compact_context)
