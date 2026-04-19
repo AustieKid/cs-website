@@ -782,10 +782,33 @@ keywords:
     }
 
     function getRankedEntries(query, options) {
+      const seenKeys = new Set();
       return searchIndex
         .map((item) => ({ item, score: scoreItem(item, query, options) }))
         .filter((entry) => entry.score > 0)
         .sort((a, b) => b.score - a.score)
+        .filter((entry) => {
+          const item = entry.item || {};
+          const rawKey = item.url || item.permalink || item.slug || item.id || '';
+          const stableKey = rawKey
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replace(/\/$/, '');
+          const fallbackTitleKey = normalizeText(item.title || '');
+          const dedupeKey = stableKey || `title:${fallbackTitleKey}`;
+
+          if (!dedupeKey) {
+            return true;
+          }
+
+          if (seenKeys.has(dedupeKey)) {
+            return false;
+          }
+
+          seenKeys.add(dedupeKey);
+          return true;
+        })
         .slice(0, 5);
     }
 
