@@ -28,6 +28,7 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 DEFAULT_MODEL = "llama3.2:3b"
 DEFAULT_TOP_K = 5
 MAX_CONTEXT_CHARS = 2800   # fits comfortably in 3 B-param prompt budget
+MAX_EXCERPT_CHARS = 400    # per-chunk text length in the grounding block
 
 
 # ---------------------------------------------------------------------------
@@ -47,8 +48,8 @@ def _chunk_summary(chunk: dict[str, Any]) -> str:
         header += f"  ({url})"
     lines.append(header)
     # Truncate text to keep prompt compact
-    excerpt = text[:400].rstrip()
-    if len(text) > 400:
+    excerpt = text[:MAX_EXCERPT_CHARS].rstrip()
+    if len(text) > MAX_EXCERPT_CHARS:
         excerpt = excerpt.rsplit(" ", 1)[0] + "…"
     lines.append(excerpt)
     return "\n".join(lines)

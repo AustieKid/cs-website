@@ -101,7 +101,7 @@ class Retriever:
         if etype == "course":
             code = chunk.get("course_code") or ""
             if code:
-                keys.append(_normalize_course_code(code).lower())
+                keys.append(_normalize_course_code(code))
 
         name = chunk.get("title") or ""
         if name:
