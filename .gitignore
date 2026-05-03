@@ -27,3 +27,5 @@ pkg/
 test/dest
 tmp/*
 Footer
+__pycache__/
+*.pyc
