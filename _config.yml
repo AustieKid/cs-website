@@ -48,6 +48,11 @@ plugins:
 
 future: true
 
+collections:
+  people:
+    output: true
+    permalink: /people/:name/
+
 
 # Exclude from processing.
 # The following items will not be processed, by default.

@@ -60,6 +60,29 @@ layout: page
     </div>
   </div>
 
+  {% if page.research_areas and page.research_areas.size > 0 %}
+  <section class="person-profile-section">
+    <h2>Research Areas</h2>
+    <ul>
+      {% for area in page.research_areas %}
+      <li>{{ area }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% assign teaching_items = page.teaching | default: page.recent_teaching %}
+  {% if teaching_items and teaching_items.size > 0 %}
+  <section class="person-profile-section">
+    <h2>Teaching</h2>
+    <ul>
+      {% for item in teaching_items %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
   {% include entity-connections.html %}
 
   {% assign stripped_content = content | strip %}
